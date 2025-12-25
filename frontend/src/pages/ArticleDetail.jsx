@@ -9,6 +9,7 @@ export default function ArticleDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showOriginal, setShowOriginal] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
     const fetchArticle = async () => {
@@ -17,6 +18,7 @@ export default function ArticleDetail() {
       try {
         const data = await articleService.getById(parseInt(id));
         setArticle(data);
+        setIsDemo(articleService.isUsingMockData());
       } catch (err) {
         setError('Failed to load article. Please try again later.');
         console.error(err);
@@ -86,6 +88,22 @@ export default function ArticleDetail() {
 
   return (
     <div className="min-h-screen bg-[#09090b]">
+      {/* Demo Mode Banner */}
+      {isDemo && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20">
+          <div className="max-w-4xl mx-auto px-6 lg:px-8 py-3">
+            <div className="flex items-center justify-center gap-2 text-amber-400 text-sm">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>
+                <strong>Demo Mode:</strong> Viewing sample article data.
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="border-b border-zinc-800/50 sticky top-0 bg-[#09090b]/80 backdrop-blur-xl z-10">
         <div className="max-w-4xl mx-auto px-6 lg:px-8 py-6">

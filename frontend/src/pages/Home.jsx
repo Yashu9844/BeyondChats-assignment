@@ -9,12 +9,14 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [scraping, setScraping] = useState(false);
   const [enhancing, setEnhancing] = useState({});
+  const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
     const fetchArticles = async () => {
       try {
         const data = await articleService.getAll();
         setArticles(data);
+        setIsDemo(articleService.isUsingMockData());
       } catch (err) {
         setError('Failed to load articles. Please try again later.');
         console.error(err);
@@ -127,6 +129,22 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#09090b]">
+      {/* Demo Mode Banner */}
+      {isDemo && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20">
+          <div className="max-w-7xl mx-auto px-6 lg:px-8 py-3">
+            <div className="flex items-center justify-center gap-2 text-amber-400 text-sm">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>
+                <strong>Demo Mode:</strong> Backend server is offline. Showing sample articles to demonstrate the UI.
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="border-b border-zinc-800/50">
         <div className="max-w-7xl mx-auto px-6 lg:px-8 py-8">
@@ -226,7 +244,8 @@ export default function Home() {
               
               <button
                 onClick={handleAddMoreArticle}
-                disabled={scraping}
+                disabled={scraping || isDemo}
+                title={isDemo ? "Backend server required for this feature" : "Add new article"}
                 className="px-4 py-2 bg-zinc-100 text-zinc-900 text-sm font-medium rounded-lg hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {scraping ? (
