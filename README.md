@@ -104,14 +104,13 @@ BeyondChats/
     └── README.md                # Frontend-specific docs
 ```
 
-## 🚀 Quick Start (Local Setup)
+## 🚀 Quick Start (Full Stack Local Setup)
 
 ### Prerequisites
 
-- PHP 8.3+
-- Composer
-- Node.js 18+
-- npm or yarn
+- PHP 8.3+ with Composer
+- Node.js 18+ with npm
+- SQLite (included) or PostgreSQL
 
 ### 1. Clone the Repository
 
@@ -128,25 +127,31 @@ cd beyondchatsbackend
 # Install PHP dependencies
 composer install
 
-# Create database
+# Copy environment file
+cp .env.example .env
+
+# Generate app key
+php artisan key:generate
+
+# Create SQLite database
 touch database/database.sqlite
 
 # Run migrations
 php artisan migrate
 
-# Start server
+# Start server (keep this terminal open)
 php artisan serve
 ```
 
-Backend will be available at: **http://localhost:8000**
+✅ Backend running at: **http://localhost:8000**
 
-#### Scrape Articles
+#### Scrape Articles (run once)
 
 ```bash
-# Trigger scraper via API
+# In a new terminal, trigger scraper
 curl -X POST http://localhost:8000/api/scrape
 
-# Or run artisan command
+# Or use artisan command
 php artisan scrape:beyondchats
 ```
 
@@ -158,15 +163,20 @@ cd workernode
 # Install dependencies
 npm install
 
-# Configure environment
+# Create environment file
 cp .env.example .env
-# Edit .env with your API keys:
-# - LARAVEL_BASE_URL=http://localhost:8000
-# - GOOGLE_API_KEY=your_key
-# - GOOGLE_CSX_ENGINE_ID=your_engine_id
-# - GROQ_API_KEY=your_groq_key
+```
 
-# Run worker (enhances latest article)
+Edit `.env` with your API keys:
+```env
+LARAVEL_BASE_URL=http://localhost:8000
+GOOGLE_API_KEY=your_google_api_key
+GOOGLE_CSX_ENGINE_ID=your_search_engine_id
+GROQ_API_KEY=your_groq_api_key
+```
+
+```bash
+# Run worker to enhance latest article
 node index.js
 ```
 
@@ -178,14 +188,34 @@ cd frontend
 # Install dependencies
 npm install
 
-# Configure environment
+# Create environment file
 echo "VITE_LARAVEL_API_URL=http://localhost:8000/api" > .env.local
 
-# Start dev server
+# Start dev server (keep this terminal open)
 npm run dev
 ```
 
-Frontend will be available at: **http://localhost:5173**
+✅ Frontend running at: **http://localhost:5173**
+
+---
+
+## 🔄 Running the Full Stack
+
+Open **3 terminals** and run:
+
+| Terminal | Command | URL |
+|----------|---------|-----|
+| 1 | `cd beyondchatsbackend && php artisan serve` | http://localhost:8000 |
+| 2 | `cd frontend && npm run dev` | http://localhost:5173 |
+| 3 | `cd workernode && node index.js` | (runs once) |
+
+**Flow:**
+1. Start backend → Start frontend → Run worker
+2. Frontend fetches articles from backend API
+3. Worker enhances articles with AI + references
+4. Refresh frontend to see enhanced articles!
+
+---
 
 ## 📡 API Endpoints
 
@@ -249,9 +279,11 @@ VITE_LARAVEL_API_URL=http://beyondchatsbackend.test/api
 ## 📸 Screenshots
 
 ### Home Page - Article Listing
-> Shows both original and AI-enhanced articles in a clean card layout
+![Homepage](frontend/public/Homepage.png)
+> Shows both original and AI-enhanced articles in a premium glass morphism card layout
 
 ### Article Detail - Enhanced View
+![Article Detail](frontend/public/ArticleDetail.png)
 > Displays rewritten content with collapsible original text and clickable references
 
 ## ✅ Assignment Checklist
