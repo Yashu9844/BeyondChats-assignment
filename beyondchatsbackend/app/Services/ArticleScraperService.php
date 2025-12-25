@@ -10,7 +10,7 @@ class ArticleScraperService
     private const BASE_URL = 'https://beyondchats.com/blogs';
     
     /**
-     * Scrape the 5 oldest articles from the last page of BeyondChats blogs
+     * Scrape only ONE new article from any page (starts from last page, goes backwards)
      * 
      * @return array
      */
@@ -19,22 +19,30 @@ class ArticleScraperService
         // Step 1: Get the last page number
         $lastPageNumber = $this->getLastPageNumber();
         
-        // Step 2: Fetch articles from the last page
-        $articleUrls = $this->getArticleUrlsFromPage($lastPageNumber);
-        
-        // Step 3: Get the 5 oldest articles (last 5 from the page)
-        $oldestArticleUrls = array_slice($articleUrls, -5);
-        
-        // Step 4: Scrape full content from each article
-        $articles = [];
-        foreach ($oldestArticleUrls as $url) {
-            $article = $this->scrapeArticleContent($url);
-            if ($article) {
-                $articles[] = $article;
+        // Step 2: Try each page starting from last, going backwards
+        // This ensures we get the oldest articles first
+        for ($pageNum = $lastPageNumber; $pageNum >= 1; $pageNum--) {
+            $articleUrls = $this->getArticleUrlsFromPage($pageNum);
+            
+            // Step 3: Find the first article that doesn't exist yet
+            foreach ($articleUrls as $url) {
+                // Quick check: does this URL exist?
+                $exists = \App\Models\Article::where('source_url', $url)->exists();
+                
+                if (!$exists) {
+                    // URL doesn't exist, now scrape it
+                    $article = $this->scrapeArticleContent($url);
+                    
+                    if ($article) {
+                        // Found a new article, return just this one
+                        return [$article];
+                    }
+                }
             }
         }
         
-        return $articles;
+        // If all articles from all pages exist, return empty
+        return [];
     }
     
     /**
