@@ -68,40 +68,72 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 // ========== PHASE 2.1: DATA COLLECTION ==========
 
 /**
- * Step 1: Fetch the latest article from Laravel API
- * Assumes articles are sorted by created_at DESC
+ * Step 1: Fetch article from Laravel API
+ * Can fetch specific article by ID or latest article
  */
 async function fetchLatestArticle() {
-  console.log('\n📥 STEP 1: Fetching latest article from Laravel...');
+  // Check if specific article ID is provided via environment
+  const articleId = process.env.ARTICLE_ID;
   
-  const url = `${LARAVEL_BASE_URL}/api/articles`;
-  
-  try {
-    const response = await axios.get(url, {
-      headers: { 'Accept': 'application/json' }
-    });
-
-    const articles = response.data.data;
+  if (articleId) {
+    console.log(`\n📥 STEP 1: Fetching article ID ${articleId} from Laravel...`);
+    const url = `${LARAVEL_BASE_URL}/api/articles/${articleId}`;
     
-    if (!articles || articles.length === 0) {
-      throw new Error('No articles found. Run Laravel scraper first.');
+    try {
+      const response = await axios.get(url, {
+        headers: { 'Accept': 'application/json' }
+      });
+
+      const article = response.data.data;
+      
+      if (!article) {
+        throw new Error(`Article ID ${articleId} not found`);
+      }
+      
+      console.log(`   ✓ Found article ID: ${article.id}`);
+      console.log(`   ✓ Title: "${article.title}"`);
+      console.log(`   ✓ Content length: ${article.content.length} chars`);
+      
+      return {
+        id: article.id,
+        title: article.title,
+        content: article.content
+      };
+    } catch (error) {
+      console.error('   ❌ Failed to fetch article:', error.message);
+      throw error;
     }
+  } else {
+    // Fetch latest article (default behavior)
+    console.log('\n📥 STEP 1: Fetching latest article from Laravel...');
+    const url = `${LARAVEL_BASE_URL}/api/articles`;
+    
+    try {
+      const response = await axios.get(url, {
+        headers: { 'Accept': 'application/json' }
+      });
 
-    // Assumption: Articles are sorted by created_at DESC
-    const latest = articles[0];
-    
-    console.log(`   ✓ Found article ID: ${latest.id}`);
-    console.log(`   ✓ Title: "${latest.title}"`);
-    console.log(`   ✓ Content length: ${latest.content.length} chars`);
-    
-    return {
-      id: latest.id,
-      title: latest.title,
-      content: latest.content
-    };
-  } catch (error) {
-    console.error('   ❌ Failed to fetch article:', error.message);
-    throw error;
+      const articles = response.data.data;
+      
+      if (!articles || articles.length === 0) {
+        throw new Error('No articles found. Run Laravel scraper first.');
+      }
+      
+      const latest = articles[0];
+      
+      console.log(`   ✓ Found article ID: ${latest.id}`);
+      console.log(`   ✓ Title: "${latest.title}"`);
+      console.log(`   ✓ Content length: ${latest.content.length} chars`);
+      
+      return {
+        id: latest.id,
+        title: latest.title,
+        content: latest.content
+      };
+    } catch (error) {
+      console.error('   ❌ Failed to fetch article:', error.message);
+      throw error;
+    }
   }
 }
 

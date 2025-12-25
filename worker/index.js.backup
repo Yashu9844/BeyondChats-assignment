@@ -1,0 +1,451 @@
+
+
+require('dotenv').config();
+const axios = require('axios');
+const cheerio = require('cheerio');
+
+// ========== CONFIGURATION ==========
+const LARAVEL_BASE_URL = process.env.LARAVEL_BASE_URL || 'http://localhost:8000';
+const LLM_API_KEY = process.env.LLM_API_KEY;
+
+if (!LLM_API_KEY) {
+  console.error(' Error: LLM_API_KEY not set in .env file');
+  process.exit(1);
+}
+
+// Google Gemini API endpoint
+// Using gemini-2.0-flash-exp model with v1beta API
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${LLM_API_KEY}`;
+
+// Helper: delay between requests
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// FALLBACK: Real article URLs to use if Google blocks scraping
+// These are legitimate business/small business articles for reference
+const FALLBACK_REFERENCE_URLS = [
+  'https://www.forbes.com/advisor/business/small-business-guide/',
+  'https://www.sba.gov/business-guide/10-steps-start-your-business',
+  'https://www.businessnewsdaily.com/4686-how-to-start-a-business.html',
+  'https://www.entrepreneur.com/starting-a-business'
+];
+
+// ========== PHASE 2.1: DATA COLLECTION ==========
+
+/**
+ * Step 3: Fetch the latest article from Laravel API
+ */
+async function fetchLatestArticle() {
+  console.log('\n📥 Step 3: Fetching latest article from Laravel API...');
+  
+  const url = `${LARAVEL_BASE_URL}/api/articles`;
+  const response = await axios.get(url, {
+    headers: { 'Accept': 'application/json' }
+  });
+
+  const articles = response.data.data;
+  
+  if (!articles || articles.length === 0) {
+    throw new Error('No articles found. Run Laravel scraper first.');
+  }
+
+  // Assuming Laravel returns articles sorted by created_at DESC
+  const latest = articles[0];
+  
+  console.log(`   ✓ Found article ID: ${latest.id}`);
+  console.log(`   ✓ Title: ${latest.title}`);
+  
+  return {
+    id: latest.id,
+    title: latest.title,
+    content: latest.content
+  };
+}
+
+/**
+ * Step 4: Perform Google search and extract top result URLs
+ */
+async function googleSearch(query) {
+  console.log('\n🔍 Step 4: Performing Google search...');
+  
+  // Clean the query: remove "- Beyondchats" and other branding
+  const cleanQuery = query
+    .replace(/- Beyondchats?/gi, '')
+    .replace(/\|.*$/, '')
+    .trim();
+  
+  console.log(`   Original: "${query}"`);
+  console.log(`   Cleaned: "${cleanQuery}"`);
+  
+  const searchUrl = 'https://www.google.com/search';
+  
+  try {
+    const response = await axios.get(searchUrl, {
+      params: {
+        q: cleanQuery,
+        num: 20,  // Request more results
+        hl: 'en',
+        gl: 'us'
+      },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1'
+      },
+      timeout: 15000
+    });
+
+    const $ = cheerio.load(response.data);
+    const urls = new Set();
+
+    console.log('   🔎 Parsing search results...');
+
+    // Method 1: /url?q= pattern (most common)
+    $('a[href*="/url?q="]').each((_, element) => {
+      const href = $(element).attr('href') || '';
+      try {
+        const urlPart = href.split('/url?q=')[1].split('&')[0];
+        const decodedUrl = decodeURIComponent(urlPart);
+        if (isValidArticleUrl(decodedUrl)) {
+          urls.add(decodedUrl);
+        }
+      } catch (e) {}
+    });
+
+    // Method 2: Direct href links (newer Google format)
+    $('a[href^="http"]').each((_, element) => {
+      const href = $(element).attr('href') || '';
+      if (isValidArticleUrl(href)) {
+        urls.add(href);
+      }
+    });
+
+    // Method 3: Search result divs with cite elements
+    $('cite').each((_, element) => {
+      const text = $(element).text();
+      if (text.startsWith('http')) {
+        const url = text.split(' ›')[0];
+        if (isValidArticleUrl(url)) {
+          urls.add(url);
+        }
+      }
+    });
+
+    const urlArray = Array.from(urls);
+    console.log(`   ✓ Found ${urlArray.length} external article URLs`);
+    
+    if (urlArray.length > 0) {
+      console.log('   📋 Top URLs:');
+      urlArray.slice(0, 5).forEach((url, i) => {
+        console.log(`      ${i + 1}. ${url.substring(0, 80)}...`);
+      });
+    }
+    
+    // Return first 2
+    return urlArray.slice(0, 2);
+    
+  } catch (error) {
+    console.error('   ⚠️ Google search failed:', error.message);
+    return [];
+  }
+}
+
+/**
+ * Helper: Check if URL is valid for article scraping
+ */
+function isValidArticleUrl(url) {
+  try {
+    // Must be http/https
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      return false;
+    }
+
+    // Exclude common non-article domains
+    const excludeDomains = [
+      'google.', 'youtube.', 'facebook.', 'twitter.', 'instagram.',
+      'linkedin.', 'reddit.com', 'wikipedia.org',
+      'beyondchats.com', 'webcache.', 'translate.google'
+    ];
+    
+    if (excludeDomains.some(domain => url.includes(domain))) {
+      return false;
+    }
+
+    // Parse URL
+    const urlObj = new URL(url);
+    
+    // Must have reasonable path (not just homepage)
+    const pathParts = urlObj.pathname.split('/').filter(Boolean);
+    if (pathParts.length < 1) return false;
+    
+    // Exclude common non-article paths
+    const excludePaths = ['/search', '/login', '/signup', '/about', '/contact'];
+    if (excludePaths.some(path => urlObj.pathname.startsWith(path))) {
+      return false;
+    }
+
+    return true;
+    
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Step 5: Scrape content from external article URL
+ */
+async function scrapeArticle(url) {
+  console.log(`   📄 Scraping: ${url}`);
+  
+  const response = await axios.get(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept-Language': 'en-US,en;q=0.9'
+    },
+    timeout: 10000
+  });
+
+  const $ = cheerio.load(response.data);
+
+  // Extract title
+  let title = $('meta[property="og:title"]').attr('content') ||
+              $('meta[name="twitter:title"]').attr('content') ||
+              $('title').text() || 
+              '';
+  title = title.trim();
+
+  // Extract main content (heuristic approach)
+  let contentRoot = $('article');
+  if (!contentRoot.length) contentRoot = $('main');
+  if (!contentRoot.length) contentRoot = $('#content, .content, .article-content, .post-content').first();
+  if (!contentRoot.length) contentRoot = $('body');
+
+  // Collect paragraphs, filter out nav/footer/header
+  const paragraphs = [];
+  contentRoot.find('p').each((_, p) => {
+    const parent = $(p).parent();
+    const parentTag = parent.prop('tagName') || '';
+    const parentClass = parent.attr('class') || '';
+    
+    // Skip navigation, footer, header, sidebar
+    if (/nav|footer|header|aside|sidebar/i.test(parentTag)) return;
+    if (/nav|footer|header|aside|sidebar|menu/i.test(parentClass)) return;
+
+    const text = $(p).text().replace(/\s+/g, ' ').trim();
+    if (text.length > 50) {
+      paragraphs.push(text);
+    }
+  });
+
+  const content = paragraphs.join('\n\n');
+
+  console.log(`      ✓ Extracted ${paragraphs.length} paragraphs`);
+
+  return { url, title, content };
+}
+
+/**
+ * Step 5-6: Collect 2 reference articles
+ */
+async function collectReferenceArticles(originalArticle) {
+  console.log('\n📚 Step 5-6: Collecting reference articles...');
+  
+  let searchUrls = await googleSearch(originalArticle.title);
+  
+  // If Google blocks us, use fallback URLs
+  if (searchUrls.length === 0) {
+    console.warn('\n⚠️ Google search returned no results.');
+    console.log('   🔄 Using fallback reference URLs instead...');
+    
+    // Filter fallback URLs to find best matches for the topic
+    searchUrls = FALLBACK_REFERENCE_URLS.slice(0, 4);
+    
+    console.log('   📚 Fallback URLs selected:');
+    searchUrls.forEach((url, i) => {
+      console.log(`      ${i + 1}. ${url}`);
+    });
+  }
+
+  const referenceArticles = [];
+  
+  for (const url of searchUrls) {
+    try {
+      const article = await scrapeArticle(url);
+      
+      if (article.content && article.content.length > 300) {
+        referenceArticles.push(article);
+        console.log(`      ✓ Added reference article`);
+      } else {
+        console.log(`      ⚠ Skipped (content too short)`);
+      }
+      
+      // Be polite: wait 1s between scrapes
+      await sleep(1000);
+      
+      if (referenceArticles.length >= 2) break;
+    } catch (error) {
+      console.log(`      ⚠ Failed to scrape: ${error.message}`);
+    }
+  }
+
+  if (referenceArticles.length === 0) {
+    throw new Error('Could not scrape any reference articles');
+  }
+
+  console.log(`   ✓ Collected ${referenceArticles.length} reference article(s)`);
+  
+  return referenceArticles;
+}
+
+// ========== PHASE 2.2: LLM PROCESSING & PUBLISHING ==========
+
+/**
+ * Step 7-8: Call LLM to rewrite article
+ */
+async function rewriteWithLLM(originalArticle, referenceArticles) {
+  console.log('\n🤖 Step 7-8: Calling LLM (Gemini) to rewrite article...');
+  
+  // Build reference summary
+  const referenceSummary = referenceArticles
+    .map((ref, idx) => `
+Reference Article ${idx + 1}:
+URL: ${ref.url}
+Title: ${ref.title}
+
+Content:
+${ref.content}
+`).join('\n---\n');
+
+  const systemPrompt = `You are an expert blog editor. Your task:
+
+1. Rewrite the ORIGINAL ARTICLE to improve:
+   - Formatting and structure
+   - Clarity and readability
+   - Professional tone similar to top-ranking blog posts
+
+2. Use REFERENCE ARTICLES for style inspiration ONLY
+   - DO NOT copy text from references
+   - DO NOT plagiarize
+   - Preserve the original article's meaning and key points
+
+3. Return ONLY the rewritten article body
+   - DO NOT add a References section (will be added separately)
+   - Use clear headings and paragraphs
+   - Keep it engaging and informative`;
+
+  const userPrompt = `
+ORIGINAL ARTICLE:
+-----------------
+${originalArticle.content}
+
+REFERENCE ARTICLES (for style only):
+------------------------------------
+${referenceSummary}
+
+Please rewrite the ORIGINAL ARTICLE following the instructions above.`;
+
+  const payload = {
+    contents: [{
+      parts: [
+        { text: systemPrompt },
+        { text: '\n\n' },
+        { text: userPrompt }
+      ]
+    }]
+  };
+
+  const response = await axios.post(GEMINI_API_URL, payload, {
+    headers: { 'Content-Type': 'application/json' }
+  });
+
+  const candidates = response.data?.candidates;
+  if (!candidates || candidates.length === 0) {
+    throw new Error('LLM returned no candidates');
+  }
+
+  const text = candidates[0]?.content?.parts?.[0]?.text;
+  if (!text || !text.trim()) {
+    throw new Error('LLM returned empty content');
+  }
+
+  console.log('   ✓ Article rewritten by LLM');
+  
+  return text.trim();
+}
+
+/**
+ * Step 9: Append References section
+ */
+function appendReferences(rewrittenContent, referenceArticles) {
+  console.log('\n📎 Step 9: Appending References section...');
+  
+  const references = [
+    '\n\n---\n',
+    'References:',
+    ...referenceArticles.map((ref, idx) => `${idx + 1}. ${ref.url}`)
+  ].join('\n');
+
+  return rewrittenContent + references;
+}
+
+/**
+ * Step 10: Publish updated article back to Laravel
+ */
+async function publishToLaravel(articleId, updatedContent) {
+  console.log('\n📤 Step 10: Publishing updated article to Laravel...');
+  
+  const url = `${LARAVEL_BASE_URL}/api/articles/${articleId}`;
+  
+  const response = await axios.put(url, 
+    { content: updatedContent },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    }
+  );
+
+  if (response.status !== 200) {
+    throw new Error(`Laravel API returned status ${response.status}`);
+  }
+
+  console.log('   ✓ Article updated successfully in Laravel');
+}
+
+// ========== MAIN ORCHESTRATION ==========
+
+async function main() {
+  console.log('╔════════════════════════════════════════════╗');
+  console.log('║  BeyondChats Phase 2 Worker - Starting    ║');
+  console.log('╚════════════════════════════════════════════╝');
+
+  try {
+    // PHASE 2.1: Data Collection
+    const originalArticle = await fetchLatestArticle();
+    const referenceArticles = await collectReferenceArticles(originalArticle);
+
+    // PHASE 2.2: LLM Processing & Publishing
+    const rewrittenContent = await rewriteWithLLM(originalArticle, referenceArticles);
+    const finalContent = appendReferences(rewrittenContent, referenceArticles);
+    await publishToLaravel(originalArticle.id, finalContent);
+
+    console.log('\n╔════════════════════════════════════════════╗');
+    console.log('║  ✓ Phase 2 Completed Successfully!        ║');
+    console.log('╚════════════════════════════════════════════╝\n');
+
+  } catch (error) {
+    console.error('\n❌ Worker failed:', error.message);
+    if (error.response) {
+      console.error('   Response status:', error.response.status);
+      console.error('   Response data:', JSON.stringify(error.response.data, null, 2));
+    }
+    process.exit(1);
+  }
+}
+
+// Run the worker
+main();
