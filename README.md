@@ -1,5 +1,7 @@
 # BeyondChats Assignment - Full Stack Article Enhancement Platform
 
+> 🔗 **Live Demo:** [https://beyond-chats-assignment-4v4q.vercel.app](https://beyond-chats-assignment-4v4q.vercel.app)
+
 A monolithic repository containing Laravel backend, NodeJS worker, and React frontend for scraping, AI-enhancing, and displaying blog articles.
 
 ## 🏗️ Architecture Overview
@@ -72,10 +74,10 @@ PHASE 3: Display
 
 | Component | URL |
 |-----------|-----|
-| **Frontend (Vercel)** | `https://your-frontend.vercel.app` |
-| **Backend API (Railway)** | `https://your-backend.up.railway.app/api` |
+| **Frontend (Vercel)** | [https://beyond-chats-assignment-4v4q.vercel.app](https://beyond-chats-assignment-4v4q.vercel.app) |
+| **Backend API (Local)** | `http://beyondchatsbackend.test/api` |
 
-> ⚠️ Update these URLs after deployment
+> 💡 The frontend includes a **Demo Mode** with sample articles when the backend is offline.
 
 ## 📁 Project Structure
 
@@ -202,11 +204,20 @@ Frontend will be available at: **http://localhost:5173**
 | Layer | Technology |
 |-------|------------|
 | **Backend** | Laravel 12, PHP 8.3, SQLite/PostgreSQL |
-| **Worker** | Node.js, Axios, Cheerio |
-| **Frontend** | React 19, Vite, Tailwind CSS v4, Framer Motion |
+| **Worker** | Node.js 18+, Axios, Cheerio |
+| **Frontend** | React 19, Vite 7, Tailwind CSS v4, Framer Motion |
 | **LLM** | Groq (llama-3.3-70b), Google Gemini (fallback) |
 | **Search** | Google Custom Search API |
-| **Deployment** | Railway (backend), Vercel (frontend) |
+| **Deployment** | Vercel (frontend), Railway-ready (backend) |
+
+## ✨ Features
+
+- **🤖 AI-Enhanced Articles** - LLM rewrites articles with additional context
+- **🔗 Reference Citations** - Scraped references appended to enhanced articles
+- **🎨 Premium UI** - Awwwards/Dribbble-style glass morphism design
+- **📱 Fully Responsive** - Works beautifully on all devices
+- **🌙 Dark Theme** - Modern black/white theme with subtle gradients
+- **💾 Demo Mode** - Frontend works offline with sample articles
 
 ## 🔑 Environment Variables
 
@@ -221,7 +232,7 @@ DATABASE_URL=provided_by_railway
 
 ### NodeJS Worker (.env)
 ```env
-LARAVEL_BASE_URL=https://your-backend.up.railway.app
+LARAVEL_BASE_URL=http://beyondchatsbackend.test
 GOOGLE_API_KEY=your_google_api_key
 GOOGLE_CSX_ENGINE_ID=your_search_engine_id
 GROQ_API_KEY=your_groq_api_key
@@ -230,8 +241,10 @@ GEMINI_API_KEYS=key1,key2 (optional fallback)
 
 ### React Frontend (.env.local)
 ```env
-VITE_LARAVEL_API_URL=https://your-backend.up.railway.app/api
+VITE_LARAVEL_API_URL=http://beyondchatsbackend.test/api
 ```
+
+> 💡 If the backend is unreachable, the frontend automatically switches to **Demo Mode** with sample articles.
 
 ## 📸 Screenshots
 
@@ -245,27 +258,29 @@ VITE_LARAVEL_API_URL=https://your-backend.up.railway.app/api
 
 | Requirement | Status |
 |-------------|--------|
-| **Phase 1** | |
+| **Phase 1: Laravel Scraper** | |
 | Scrape 5 oldest articles from last page | ✅ |
 | Store in database | ✅ |
 | CRUD APIs | ✅ |
-| **Phase 2** | |
+| **Phase 2: NodeJS Worker** | |
 | Fetch latest article | ✅ |
 | Search on Google | ✅ |
 | Scrape 2 reference articles | ✅ |
 | Call LLM to rewrite | ✅ |
 | Publish updated article | ✅ |
 | Cite references at bottom | ✅ |
-| **Phase 3** | |
+| **Phase 3: React Frontend** | |
 | React frontend | ✅ |
 | Fetch from Laravel API | ✅ |
 | Responsive professional UI | ✅ |
 | Show original + updated articles | ✅ |
+| Premium Awwwards-style design | ✅ |
+| Demo mode fallback | ✅ |
 | **Submission** | |
 | Monolithic git repo | ✅ |
 | README with setup docs | ✅ |
 | Architecture diagram | ✅ |
-| Live frontend link | ⏳ (Deploy to Vercel) |
+| Live frontend link | ✅ [Deployed](https://beyond-chats-assignment-4v4q.vercel.app) |
 
 ## 👤 Author
 
