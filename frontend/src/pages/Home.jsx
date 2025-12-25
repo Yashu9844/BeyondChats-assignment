@@ -8,7 +8,6 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [scraping, setScraping] = useState(false);
-  const [enhancing, setEnhancing] = useState({});
   const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
@@ -32,41 +31,12 @@ export default function Home() {
   const originalArticles = articles.filter(article => !article.content.includes('---\n\nReferences:'));
   const enhancedArticles = articles.filter(article => article.content.includes('---\n\nReferences:'));
 
-  // Function to enhance article with AI (runs Phase 2 worker)
-  const handleEnhanceArticle = async (articleId) => {
-    setEnhancing(prev => ({ ...prev, [articleId]: true }));
-    try {
-      const baseUrl = import.meta.env.VITE_LARAVEL_API_URL || 'http://beyondchatsbackend.test/api';
-      const workerUrl = `${baseUrl}/enhance/${articleId}`;
-      
-      const response = await fetch(workerUrl, {
-        method: 'POST',
-        headers: { 'Accept': 'application/json' }
-      });
-      
-      if (response.ok) {
-        const data = await articleService.getAll();
-        setArticles(data);
-        alert('✓ Article enhanced with AI and references!');
-      } else {
-        alert('Failed to enhance article. Please try again.');
-      }
-    } catch (err) {
-      console.error('Enhancement error:', err);
-      alert('Error enhancing article: ' + err.message);
-    } finally {
-      setEnhancing(prev => ({ ...prev, [articleId]: false }));
-    }
-  };
-
-  // Function to trigger Laravel scraper and fetch new article
+  // Function to trigger Laravel scraper
   const handleAddMoreArticle = async () => {
     setScraping(true);
     try {
       const baseUrl = import.meta.env.VITE_LARAVEL_API_URL || 'http://beyondchatsbackend.test/api';
-      const scraperUrl = `${baseUrl}/scrape`;
-      
-      const response = await fetch(scraperUrl, {
+      const response = await fetch(`${baseUrl}/scrape`, {
         method: 'POST',
         headers: { 'Accept': 'application/json' }
       });
@@ -74,13 +44,9 @@ export default function Home() {
       if (response.ok) {
         const data = await articleService.getAll();
         setArticles(data);
-        alert('✓ New article added successfully!');
-      } else {
-        alert('Failed to scrape new article. Please try again.');
       }
     } catch (err) {
       console.error('Scraping error:', err);
-      alert('Error scraping article: ' + err.message);
     } finally {
       setScraping(false);
     }
@@ -89,129 +55,194 @@ export default function Home() {
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
-      month: 'short',
+      month: 'long',
       day: 'numeric',
     });
   };
 
-  // Helper to clean HTML from content
   const cleanContent = (html) => {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     return doc.body.textContent || '';
   };
 
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.2
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 30 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.6,
+        ease: [0.25, 0.46, 0.45, 0.94]
+      }
+    }
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#09090b] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-zinc-800 border-t-zinc-400 rounded-full animate-spin"></div>
-          <p className="text-sm text-zinc-500">Loading...</p>
-        </div>
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center gap-6"
+        >
+          <div className="relative">
+            <div className="w-12 h-12 rounded-full border-2 border-white/10 border-t-white/60 animate-spin" />
+            <div className="absolute inset-0 w-12 h-12 rounded-full border-2 border-transparent border-b-white/30 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
+          </div>
+          <p className="text-white/40 text-sm tracking-wide">Loading articles...</p>
+        </motion.div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#09090b] flex items-center justify-center">
-        <div className="text-center max-w-md px-6">
-          <p className="text-zinc-400 mb-6">{error}</p>
+      <div className="min-h-screen bg-black flex items-center justify-center px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center max-w-md"
+        >
+          <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-white/5 flex items-center justify-center">
+            <svg className="w-8 h-8 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <p className="text-white/60 mb-8">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-6 py-2.5 bg-zinc-100 text-zinc-900 text-sm font-medium rounded-lg hover:bg-white transition-colors"
+            className="px-8 py-3 bg-white text-black text-sm font-medium rounded-full hover:bg-white/90 transition-all duration-300"
           >
-            Retry
+            Try Again
           </button>
-        </div>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#09090b]">
+    <div className="min-h-screen bg-black relative overflow-hidden">
+      {/* Ambient gradient blurs */}
+      <div className="gradient-blur gradient-blur-1" />
+      <div className="gradient-blur gradient-blur-2" />
+
       {/* Demo Mode Banner */}
       {isDemo && (
-        <div className="bg-amber-500/10 border-b border-amber-500/20">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative z-20 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border-b border-amber-500/20"
+        >
           <div className="max-w-7xl mx-auto px-6 lg:px-8 py-3">
-            <div className="flex items-center justify-center gap-2 text-amber-400 text-sm">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>
-                <strong>Demo Mode:</strong> Backend server is offline. Showing sample articles to demonstrate the UI.
-              </span>
-            </div>
+            <p className="text-center text-amber-400/90 text-sm font-medium">
+              ✨ Demo Mode — Showing sample articles while backend is offline
+            </p>
           </div>
-        </div>
+        </motion.div>
       )}
 
-      {/* Header */}
-      <header className="border-b border-zinc-800/50">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-8">
+      {/* Hero Header */}
+      <header className="relative z-10 pt-20 pb-16 lg:pt-32 lg:pb-24">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="max-w-3xl"
           >
-            <h1 className="text-2xl font-semibold text-zinc-50 tracking-tight mb-2">
-              BeyondChats
+            <div className="flex items-center gap-3 mb-8">
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white/70 text-xs font-medium tracking-wide">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                AI-Powered
+              </span>
+            </div>
+
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white tracking-tight leading-[1.1] mb-6">
+              Beyond
+              <span className="bg-gradient-to-r from-white via-white/80 to-white/60 bg-clip-text text-transparent">Chats</span>
             </h1>
-            <p className="text-sm text-zinc-500">
-              AI-enhanced articles with curated references
+
+            <p className="text-lg sm:text-xl text-white/50 leading-relaxed max-w-xl">
+              Discover AI-enhanced articles with curated references from across the web. 
+              Intelligent content, beautifully presented.
             </p>
           </motion.div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 lg:px-8 py-16">
+      <main className="relative z-10 max-w-7xl mx-auto px-6 lg:px-8 pb-32">
         {/* AI-Enhanced Articles Section */}
         {enhancedArticles.length > 0 && (
-          <section className="mb-24">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.1 }}
-              className="mb-12"
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <span className="px-2.5 py-1 bg-zinc-800/50 border border-zinc-700/50 text-zinc-400 text-xs font-medium rounded-md">
-                  AI Enhanced
-                </span>
+          <motion.section
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="mb-24"
+          >
+            <motion.div variants={itemVariants} className="flex items-center gap-4 mb-12">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-semibold text-white">Enhanced</h2>
+                  <p className="text-sm text-white/40">AI-improved with references</p>
+                </div>
               </div>
-              <h2 className="text-xl font-semibold text-zinc-50">
-                Enhanced Articles
-              </h2>
             </motion.div>
 
-            <div className="space-y-4">
+            <div className="grid gap-6">
               {enhancedArticles.map((article, index) => (
                 <motion.article
                   key={article.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 + 0.2 }}
+                  variants={itemVariants}
+                  className="group"
                 >
-                  <Link
-                    to={`/article/${article.id}`}
-                    className="block group"
-                  >
-                    <div className="border border-zinc-800/50 rounded-xl p-8 hover:border-zinc-700/50 hover:bg-zinc-900/20 transition-all duration-200">
-                      <div className="flex items-start justify-between gap-6 mb-4">
-                        <div className="flex-1">
-                          <time className="text-xs text-zinc-500 font-medium uppercase tracking-wider">
-                            {formatDate(article.published_at)}
-                          </time>
-                          <h3 className="text-2xl font-semibold text-zinc-50 mt-2 mb-3 group-hover:text-zinc-200 transition-colors">
+                  <Link to={`/article/${article.id}`}>
+                    <div className="relative glass rounded-3xl p-10 lg:p-12 card-hover overflow-hidden">
+                      {/* Shine effect on hover */}
+                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 shine-effect transition-opacity duration-500" />
+                      
+                      <div className="relative flex flex-col lg:flex-row lg:items-center gap-6 lg:gap-10">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-4">
+                            <span className="px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-400 text-xs font-medium">
+                              Enhanced
+                            </span>
+                            <time className="text-xs text-white/30 font-medium">
+                              {formatDate(article.published_at)}
+                            </time>
+                          </div>
+
+                          <h3 className="text-2xl lg:text-3xl font-semibold text-white mb-4 group-hover:text-white/90 transition-colors leading-tight">
                             {cleanContent(article.title)}
                           </h3>
-                          <p className="text-zinc-400 text-sm leading-relaxed line-clamp-2">
-                            {cleanContent(article.content).substring(0, 200)}...
+
+                          <p className="text-white/40 text-base leading-relaxed line-clamp-2">
+                            {cleanContent(article.content).substring(0, 180)}...
                           </p>
                         </div>
-                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-zinc-800/50 border border-zinc-700/50 text-zinc-400 group-hover:bg-zinc-800 group-hover:border-zinc-700 group-hover:text-zinc-300 transition-all">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
+
+                        <div className="flex items-center gap-4 lg:flex-col lg:items-end">
+                          <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white group-hover:border-white transition-all duration-300">
+                            <svg className="w-5 h-5 text-white/60 group-hover:text-black transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                            </svg>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -219,82 +250,83 @@ export default function Home() {
                 </motion.article>
               ))}
             </div>
-          </section>
+          </motion.section>
         )}
 
         {/* Original Articles Section */}
         {originalArticles.length > 0 && (
-          <section>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className="mb-12 flex items-end justify-between"
-            >
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="px-2.5 py-1 bg-zinc-800/50 border border-zinc-700/50 text-zinc-400 text-xs font-medium rounded-md">
-                    Original
-                  </span>
+          <motion.section
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            <motion.div variants={itemVariants} className="flex items-center justify-between mb-12">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+                  </svg>
                 </div>
-                <h2 className="text-xl font-semibold text-zinc-50">
-                  {originalArticles.length} Classic Articles
-                </h2>
+                <div>
+                  <h2 className="text-2xl font-semibold text-white">Original Articles</h2>
+                  <p className="text-sm text-white/40">{originalArticles.length} articles from BeyondChats</p>
+                </div>
               </div>
-              
-              <button
-                onClick={handleAddMoreArticle}
-                disabled={scraping || isDemo}
-                title={isDemo ? "Backend server required for this feature" : "Add new article"}
-                className="px-4 py-2 bg-zinc-100 text-zinc-900 text-sm font-medium rounded-lg hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {scraping ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Adding...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Add Article
-                  </>
-                )}
-              </button>
+
+              {!isDemo && (
+                <button
+                  onClick={handleAddMoreArticle}
+                  disabled={scraping}
+                  className="hidden sm:flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-black text-sm font-medium hover:bg-white/90 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {scraping ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Adding...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add Article
+                    </>
+                  )}
+                </button>
+              )}
             </motion.div>
 
-            <div className="space-y-4">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {originalArticles.map((article, index) => (
                 <motion.article
                   key={article.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 + 0.4 }}
+                  variants={itemVariants}
+                  className="group"
                 >
-                  <Link
-                    to={`/article/${article.id}`}
-                    className="block group"
-                  >
-                    <div className="border border-zinc-800/50 rounded-xl p-8 hover:border-zinc-700/50 hover:bg-zinc-900/20 transition-all duration-200">
-                      <div className="flex items-start justify-between gap-6">
-                        <div className="flex-1">
-                          <time className="text-xs text-zinc-500 font-medium uppercase tracking-wider">
-                            {formatDate(article.published_at)}
-                          </time>
-                          <h3 className="text-2xl font-semibold text-zinc-50 mt-2 mb-3 group-hover:text-zinc-200 transition-colors">
-                            {cleanContent(article.title)}
-                          </h3>
-                          <p className="text-zinc-400 text-sm leading-relaxed line-clamp-2">
-                            {cleanContent(article.content).substring(0, 200)}...
-                          </p>
-                        </div>
-                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-zinc-800/50 border border-zinc-700/50 text-zinc-400 group-hover:bg-zinc-800 group-hover:border-zinc-700 group-hover:text-zinc-300 transition-all">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  <Link to={`/article/${article.id}`}>
+                    <div className="relative h-full glass rounded-2xl p-6 lg:p-8 card-hover overflow-hidden">
+                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 shine-effect transition-opacity duration-500" />
+                      
+                      <div className="relative h-full flex flex-col">
+                        <time className="text-xs text-white/30 font-medium mb-4">
+                          {formatDate(article.published_at)}
+                        </time>
+
+                        <h3 className="text-xl font-semibold text-white mb-4 group-hover:text-white/90 transition-colors leading-snug flex-grow">
+                          {cleanContent(article.title)}
+                        </h3>
+
+                        <p className="text-white/40 text-sm leading-relaxed line-clamp-3 mb-6">
+                          {cleanContent(article.content).substring(0, 120)}...
+                        </p>
+
+                        <div className="flex items-center justify-between pt-4 border-t border-white/5">
+                          <span className="text-xs text-white/30 font-medium">Read article</span>
+                          <svg className="w-4 h-4 text-white/30 group-hover:text-white/60 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                           </svg>
                         </div>
                       </div>
@@ -303,22 +335,38 @@ export default function Home() {
                 </motion.article>
               ))}
             </div>
-          </section>
+          </motion.section>
         )}
 
         {articles.length === 0 && (
-          <div className="text-center py-24">
-            <p className="text-zinc-500">No articles found</p>
-          </div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center py-32"
+          >
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-white/5 flex items-center justify-center">
+              <svg className="w-10 h-10 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+              </svg>
+            </div>
+            <p className="text-white/40 text-lg">No articles found</p>
+          </motion.div>
         )}
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-zinc-800/50 mt-24">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-8">
-          <p className="text-xs text-zinc-500">
-            © 2025 BeyondChats
-          </p>
+      <footer className="relative z-10 border-t border-white/5">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-12">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-white/30">
+              © 2025 BeyondChats. All rights reserved.
+            </p>
+            <div className="flex items-center gap-6">
+              <a href="https://github.com/Yashu9844/BeyondChats-assignment" target="_blank" rel="noopener noreferrer" className="text-sm text-white/30 hover:text-white/60 transition-colors">
+                GitHub
+              </a>
+            </div>
+          </div>
         </div>
       </footer>
     </div>
